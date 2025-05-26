@@ -2,9 +2,18 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { authAPI, AuthManager, type User, handleAPIError } from "@/lib/api"
+// Update the path below to the correct location of your api file, for example:
+import { authAPI, AuthManager, type User, handleAPIError } from "../lib/api"
+// or, if your api file is in a different directory, adjust accordingly:
+// import { authAPI, AuthManager, type User, handleAPIError } from "../../lib/api"
+// import { authAPI, AuthManager, type User, handleAPIError } from "./api"
 import { useRouter } from "next/navigation"
-import { toast } from "@/hooks/use-toast"
+// Update the path below if your use-toast file is located elsewhere, e.g.:
+import { toast } from "../hooks/use-toast"
+// or, if it's in the same directory:
+// import { toast } from "./use-toast"
+// or, if it should be in 'lib':
+// import { toast } from "@/lib/use-toast"
 
 interface AuthContextType {
   user: User | null
