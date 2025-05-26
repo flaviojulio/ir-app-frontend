@@ -132,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
   }
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {
