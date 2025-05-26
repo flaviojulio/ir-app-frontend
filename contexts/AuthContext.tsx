@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { createContext, useContext, useState, useEffect } from "react"
+import { api } from "@/lib/api"
 
 interface User {
   id: number
@@ -14,74 +14,62 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (token: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   logout: () => void
   loading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (token) {
-      fetchUser(token)
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`
+      fetchUser()
     } else {
       setLoading(false)
     }
   }, [])
 
-  const fetchUser = async (token: string) => {
+  const fetchUser = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData)
-      } else {
-        localStorage.removeItem("token")
-      }
+      const response = await api.get("/auth/me")
+      setUser(response.data)
     } catch (error) {
-      console.error("Erro ao buscar usuário:", error)
       localStorage.removeItem("token")
+      delete api.defaults.headers.common["Authorization"]
     } finally {
       setLoading(false)
     }
   }
 
-  const login = async (token: string) => {
-    localStorage.setItem("token", token)
-    await fetchUser(token)
-    router.push("/dashboard")
+  const login = async (username: string, password: string) => {
+    const formData = new FormData()
+    formData.append("username", username)
+    formData.append("password", password)
+
+    const response = await api.post("/auth/login", formData)
+    const { access_token } = response.data
+
+    localStorage.setItem("token", access_token)
+    api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`
+
+    await fetchUser()
   }
 
   const logout = async () => {
     try {
-      const token = localStorage.getItem("token")
-      if (token) {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-      }
+      await api.post("/auth/logout")
     } catch (error) {
-      console.error("Erro ao fazer logout:", error)
+      // Ignore errors on logout
     } finally {
       localStorage.removeItem("token")
+      delete api.defaults.headers.common["Authorization"]
       setUser(null)
-      router.push("/login")
     }
   }
 

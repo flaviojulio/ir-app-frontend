@@ -1,122 +1,46 @@
 # Importações existentes
-from fastapi import FastAPI, UploadFile, File, HTTPException, Path, Body, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, Path, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
-import json
-from typing import List, Dict, Any
-import uvicorn
-
-from auth import TokenExpiredError, InvalidTokenError, TokenNotFoundError, TokenRevokedError
+from typing import List, Dict, Optional
 
 # Novas importações para autenticação
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from models import (
     UsuarioCreate, UsuarioUpdate, UsuarioResponse, LoginRequest, 
-    LoginResponse, FuncaoCreate, FuncaoResponse, TokenResponse,
-    OperacaoCreate, Operacao, ResultadoMensal, CarteiraAtual, 
-    DARF, AtualizacaoCarteira, OperacaoFechada,
-    # Modelos de autenticação
+    LoginResponse, FuncaoCreate, FuncaoResponse
 )
 import auth
 
-from database import (
-    criar_tabelas, 
-    limpar_banco_dados, 
-)
-
-import services
-from services import (
-    calcular_operacoes_fechadas,
-    processar_operacoes,
-    calcular_resultados_mensais,
-    calcular_carteira_atual,
-    gerar_darfs,
-    inserir_operacao_manual,
-    atualizar_item_carteira,
-    listar_operacoes_service,
-    deletar_operacao_service
-)
-
-# Inicialização do banco de dados
-criar_tabelas()
-auth.inicializar_autenticacao()
-
-app = FastAPI(
-    title="API de Acompanhamento de Carteiras de Ações e IR",
-    description="API para upload de operações de ações e cálculo de imposto de renda",
-    version="1.0.0"
-)
-
-# Configuração de CORS para permitir requisições de origens diferentes
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Configuração do OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Função para obter o usuário atual
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
-    try:
-        payload = auth.verificar_token(token)
-    except TokenExpiredError:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict:
+    payload = auth.verificar_token(token)
+    if not payload:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"message": "O token de autenticação expirou.", "error_code": "TOKEN_EXPIRED"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except InvalidTokenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"message": f"O token de autenticação é inválido ou malformado: {str(e)}", "error_code": "TOKEN_INVALID"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except TokenNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"message": "O token de autenticação não foi reconhecido.", "error_code": "TOKEN_NOT_FOUND"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except TokenRevokedError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"message": "O token de autenticação foi revogado (ex: logout ou alteração de senha).", "error_code": "TOKEN_REVOKED"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
-            detail={"message": f"Erro inesperado durante a verificação do token: {str(e)}", "error_code": "UNEXPECTED_TOKEN_VERIFICATION_ERROR"},
-        )
-
-    sub_str = payload.get("sub")
-    if not sub_str: 
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail={"message": "Token inválido: ID de usuário (sub) ausente no payload.", "error_code": "TOKEN_PAYLOAD_MISSING_SUB"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    try:
-        usuario_id = int(sub_str)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail={"message": "Token inválido: ID de usuário (sub) não é um inteiro válido.", "error_code": "TOKEN_PAYLOAD_INVALID_SUB_FORMAT"},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    usuario_data = auth.obter_usuario(usuario_id) 
-    if not usuario_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"message": "Usuário associado ao token não encontrado.", "error_code": "USER_FOR_TOKEN_NOT_FOUND"},
+            status_code=401,
+            detail="Token inválido ou expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    return usuario_data
+    usuario_id = payload.get("sub")
+    if not usuario_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    usuario = auth.obter_usuario(usuario_id)
+    if not usuario:
+        raise HTTPException(
+            status_code=401,
+            detail="Usuário não encontrado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return usuario
 
 # Função para verificar se o usuário é administrador
 async def get_admin_user(usuario: Dict = Depends(get_current_user)) -> Dict:
@@ -147,13 +71,26 @@ async def registrar_usuario(usuario: UsuarioCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao registrar usuário: {str(e)}")
 
-@app.post("/api/auth/login", response_model=TokenResponse)
+@app.post("/api/auth/login", response_model=LoginResponse)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = auth.verificar_credenciais(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos")
-    token = auth.gerar_token(user["id"])
-    return {"access_token": token, "token_type": "bearer"}
+    """
+    Autentica um usuário e retorna um token JWT.
+    """
+    usuario = auth.verificar_credenciais(form_data.username, form_data.password)
+    
+    if not usuario:
+        raise HTTPException(
+            status_code=401,
+            detail="Credenciais inválidas",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = auth.gerar_token(usuario["id"])
+    
+    return {
+        "usuario": usuario,
+        "token": token
+    }
 
 @app.post("/api/auth/logout")
 async def logout(token: str = Depends(oauth2_scheme)):
@@ -306,172 +243,14 @@ async def criar_nova_funcao(
 # Por exemplo:
 
 @app.get("/api/operacoes", response_model=List[Operacao])
-async def listar_operacoes(usuario: Dict[str, Any] = Depends(get_current_user)):
+async def listar_operacoes(usuario: Dict = Depends(get_current_user)):
+    """
+    Lista todas as operações do usuário.
+    """
     try:
-        operacoes = listar_operacoes_service(usuario_id=usuario["id"])
+        operacoes = obter_todas_operacoes(usuario_id=usuario["id"])
         return operacoes
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao listar operações: {str(e)}")
 
-# Endpoints de operações com autenticação
-@app.post("/api/upload", response_model=Dict[str, str])
-async def upload_operacoes(
-    file: UploadFile = File(...),
-    usuario: Dict = Depends(get_current_user)
-):
-    """
-    Endpoint para upload de arquivo JSON com operações de compra e venda de ações.
-    """
-    try:
-        # Verificar se é um arquivo JSON
-        if not file.filename.endswith('.json'):
-            raise HTTPException(status_code=400, detail="Apenas arquivos JSON são aceitos")
-        
-        conteudo = await file.read()
-        
-        # Decodificar o conteúdo como string primeiro
-        conteudo_str = conteudo.decode('utf-8')
-        
-        # Parse do JSON
-        operacoes_json = json.loads(conteudo_str)
-        
-        # Validar se é uma lista
-        if not isinstance(operacoes_json, list):
-            raise HTTPException(status_code=400, detail="O arquivo JSON deve conter uma lista de operações")
-        
-        # Validar e converter cada operação
-        operacoes = []
-        for i, op_data in enumerate(operacoes_json):
-            try:
-                # Validar campos obrigatórios
-                required_fields = ['date', 'ticker', 'operation', 'quantity', 'price', 'fees']
-                for field in required_fields:
-                    if field not in op_data:
-                        raise ValueError(f"Campo obrigatório '{field}' ausente")
-                
-                # Validar tipos
-                if not isinstance(op_data['quantity'], (int, float)) or op_data['quantity'] <= 0:
-                    raise ValueError("Quantidade deve ser um número positivo")
-                
-                if not isinstance(op_data['price'], (int, float)) or op_data['price'] <= 0:
-                    raise ValueError("Preço deve ser um número positivo")
-                
-                if not isinstance(op_data['fees'], (int, float)) or op_data['fees'] < 0:
-                    raise ValueError("Taxas devem ser um número não negativo")
-                
-                if op_data['operation'] not in ['buy', 'sell']:
-                    raise ValueError("Operação deve ser 'buy' ou 'sell'")
-                
-                # Criar objeto OperacaoCreate
-                operacao = OperacaoCreate(**op_data)
-                operacoes.append(operacao)
-                
-            except Exception as e:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Erro na operação {i+1}: {str(e)}"
-                )
-        
-        # Processar as operações
-        processar_operacoes(operacoes, usuario_id=usuario["id"])
-        
-        return {"mensagem": f"Arquivo processado com sucesso. {len(operacoes)} operações importadas."}
-        
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"Formato de arquivo JSON inválido: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
-
-@app.get("/api/resultados", response_model=List[ResultadoMensal])
-async def obter_resultados(usuario: Dict = Depends(get_current_user)):
-    """
-    Retorna os resultados mensais de apuração de imposto de renda.
-    """
-    try:
-        resultados = calcular_resultados_mensais(usuario_id=usuario["id"])
-        return resultados
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao calcular resultados: {str(e)}")
-
-@app.get("/api/carteira", response_model=List[CarteiraAtual])
-async def obter_carteira(usuario: Dict = Depends(get_current_user)):
-    """
-    Retorna a carteira atual de ações.
-    """
-    try:
-        carteira = calcular_carteira_atual(usuario_id=usuario["id"])
-        return carteira
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao calcular carteira: {str(e)}")
-
-@app.get("/api/darfs", response_model=List[DARF])
-async def obter_darfs(usuario: Dict = Depends(get_current_user)):
-    """
-    Retorna os DARFs gerados para pagamento de imposto de renda.
-    """
-    try:
-        darfs = gerar_darfs(usuario_id=usuario["id"])
-        return darfs
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao gerar DARFs: {str(e)}")
-
-@app.post("/api/operacoes", response_model=Dict[str, str])
-async def criar_operacao(
-    operacao: OperacaoCreate,
-    usuario: Dict = Depends(get_current_user)
-):
-    """
-    Cria uma nova operação manualmente.
-    """
-    try:
-        inserir_operacao_manual(operacao, usuario_id=usuario["id"])
-        return {"mensagem": "Operação criada com sucesso."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao criar operação: {str(e)}")
-
-@app.get("/api/operacoes/fechadas", response_model=List[OperacaoFechada])
-async def obter_operacoes_fechadas(usuario: Dict = Depends(get_current_user)):
-    """
-    Retorna as operações fechadas (compra seguida de venda ou vice-versa).
-    """
-    try:
-        operacoes_fechadas = calcular_operacoes_fechadas(usuario_id=usuario["id"])
-        return operacoes_fechadas
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao calcular operações fechadas: {str(e)}")
-
-@app.delete("/api/reset", response_model=Dict[str, str])
-async def resetar_banco(admin: Dict = Depends(get_admin_user)):
-    """
-    Remove todos os dados do banco de dados.
-    Requer permissão de administrador.
-    """
-    try:
-        limpar_banco_dados()
-        return {"mensagem": "Banco de dados limpo com sucesso."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao limpar banco de dados: {str(e)}")
-
-@app.delete("/api/operacoes/{operacao_id}", response_model=Dict[str, str])
-async def deletar_operacao(
-    operacao_id: int = Path(..., description="ID da operação"),
-    usuario: Dict = Depends(get_current_user)
-):
-    """
-    Remove uma operação pelo ID.
-    """
-    try:
-        success = deletar_operacao_service(operacao_id=operacao_id, usuario_id=usuario["id"])
-        if success:
-            return {"mensagem": f"Operação {operacao_id} removida com sucesso."}
-        else:
-            raise HTTPException(status_code=404, detail=f"Operação {operacao_id} não encontrada ou não pertence ao usuário.")
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao remover operação: {str(e)}")
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# Continuar modificando os outros endpoints...
