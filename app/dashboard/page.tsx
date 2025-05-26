@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useAuth } from "@/components/providers/auth-provider"
+import { useAuth } from "@/hooks/use-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/utils"
+import { apiClient } from "@/lib/api"
 import { PortfolioChart } from "@/components/portfolio-chart"
 import { RecentTransactions } from "@/components/recent-transactions"
 import { UploadModal } from "@/components/upload-modal"
@@ -53,36 +54,29 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, isLoading: authIsLoading, isAuthenticated } = useAuth()
   const { toast } = useToast()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (isAuthenticated && !authIsLoading) {
+      fetchDashboardData()
+    } else if (!authIsLoading && !isAuthenticated) {
+      // AuthGuard should handle redirect, but good to prevent API calls
+      setLoading(false) 
+    }
+  }, [isAuthenticated, authIsLoading])
 
   const fetchDashboardData = async () => {
+    setLoading(true) // Ensure loading is true when fetching starts
     try {
-      const token = localStorage.getItem("token")
-      if (!token) return
-
-      const [carteiraRes, resultadosRes, darfsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/carteira`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE_URL}/api/resultados`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE_URL}/api/darfs`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+      const [carteira, resultados, darfs] = await Promise.all([
+        apiClient.get<DashboardData["carteira"]>("/api/carteira"),
+        apiClient.get<DashboardData["resultados"]>("/api/resultados"),
+        apiClient.get<DashboardData["darfs"]>("/api/darfs"),
       ])
-
-      const carteira = carteiraRes.ok ? await carteiraRes.json() : []
-      const resultados = resultadosRes.ok ? await resultadosRes.json() : []
-      const darfs = darfsRes.ok ? await darfsRes.json() : []
 
       const totalValue = carteira.reduce((sum: number, item: any) => sum + item.quantidade * item.preco_medio, 0)
 
@@ -110,7 +104,18 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
+  if (authIsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verificando autenticação...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading && isAuthenticated) { // Only show data loading if authenticated
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -119,6 +124,16 @@ export default function DashboardPage() {
         </div>
       </div>
     )
+  }
+
+  // If not authenticated and not loading auth, AuthGuard should have redirected.
+  // If it hasn't for some reason, or to prevent flicker, we can show minimal UI or null.
+  // For now, if data is null (which it would be if not authenticated), many parts of the UI will be empty or show defaults.
+  // This assumes AuthGuard is primary mechanism for redirecting unauthenticated users.
+  if (!isAuthenticated) {
+    // Optionally, redirect here or show a message, though AuthGuard is preferred.
+    // For example: router.push('/login');
+    return null; // Or a more specific "not authenticated" message
   }
 
   const currentMonth = new Date().toISOString().slice(0, 7)
