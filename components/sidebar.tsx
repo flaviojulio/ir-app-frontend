@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/components/providers/auth-provider"
+import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { LayoutDashboard, TrendingUp, FileText, Settings, LogOut, Menu, X } from "lucide-react"
 import Link from "next/link"
