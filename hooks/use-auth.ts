@@ -20,7 +20,6 @@ interface AuthContextType {
   }) => Promise<void>
 }
 
-// Criar contexto com valor padrão
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
@@ -50,12 +49,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } catch (error) {
         AuthManager.removeToken()
-        handleAPIError(error)
+        // Não chame handleAPIError aqui para evitar loop se o erro for no getMe
+        // e o usuário já estiver sendo redirecionado ou o token removido.
+        // Apenas logar o erro pode ser suficiente ou deixar o AuthGuard lidar com isso.
+        console.error("Erro durante initAuth:", error)
       } finally {
         setIsLoading(false)
       }
     }
-
     initAuth()
   }, [])
 
@@ -64,18 +65,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true)
       const response = await authAPI.login(username, password)
       AuthManager.setToken(response.access_token)
-
       const userData = await authAPI.getMe()
       setUser(userData)
-
       toast({
         title: "Login realizado",
         description: `Bem-vindo, ${userData.nome_completo || userData.username}!`,
       })
-
       router.push("/")
     } catch (error) {
-      handleAPIError(error)
+      handleAPIError(error) // Aqui é apropriado, pois é uma ação direta do usuário
       throw error
     } finally {
       setIsLoading(false)
@@ -84,14 +82,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     try {
-      await authAPI.logout()
-    } catch (error) {
-      console.error("Logout error:", error)
+      // Tentar o logout da API primeiro, mas não bloquear se falhar
+      await authAPI.logout().catch(error => console.error("Erro na API de logout:", error))
     } finally {
       AuthManager.removeToken()
       setUser(null)
       router.push("/login")
-
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
@@ -108,12 +104,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true)
       await authAPI.register(userData)
-
       toast({
         title: "Conta criada",
         description: "Sua conta foi criada com sucesso. Faça login para continuar.",
       })
-
       router.push("/login")
     } catch (error) {
       handleAPIError(error)
@@ -137,12 +131,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
-
-  // Verificação adicional para debug
   if (context === undefined) {
     console.error("useAuth foi chamado fora do AuthProvider")
     throw new Error("useAuth must be used within an AuthProvider")
   }
-
   return context
 }
