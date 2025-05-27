@@ -5,9 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar, DollarSign, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react"
+import type { ResultadoMensal } from "@/lib/types"
 
 interface TaxResultsProps {
-  resultados: any[]
+  resultados: ResultadoMensal[]
 }
 
 export function TaxResults({ resultados }: TaxResultsProps) {

@@ -6,9 +6,10 @@ import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
+import type { ResultadoMensal } from "@/lib/types"
 
 interface TaxMeterProps {
-  resultados: any[]
+  resultados: ResultadoMensal[]
 }
 
 export function TaxMeter({ resultados }: TaxMeterProps) {

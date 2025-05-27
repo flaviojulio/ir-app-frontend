@@ -11,15 +11,15 @@ import { StockTable } from "@/components/StockTable"
 import { TaxMeter } from "@/components/TaxMeter"
 import { UploadOperations } from "@/components/UploadOperations"
 import { AddOperation } from "@/components/AddOperation"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { OperationsHistory } from "@/components/OperationsHistory"
 import { TaxResults } from "@/components/TaxResults"
 import { useToast } from "@/hooks/use-toast"
+import type { Operacao, CarteiraItem, ResultadoMensal } from "@/lib/types"
 
 interface DashboardData {
-  carteira: any[]
-  resultados: any[]
-  operacoes: any[]
+  carteira: CarteiraItem[]
+  resultados: ResultadoMensal[]
+  operacoes: Operacao[]
 }
 
 export function Dashboard() {
@@ -69,9 +69,9 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
-    );
+    )
   }
 
   return (

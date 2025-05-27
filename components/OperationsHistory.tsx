@@ -10,9 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, Search } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import type { Operacao } from "@/lib/types"
 
 interface OperationsHistoryProps {
-  operacoes: any[]
+  operacoes: Operacao[]
   onUpdate: () => void
 }
 

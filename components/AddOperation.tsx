@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, AlertCircle, Loader2 } from "lucide-react"
+import { Plus, AlertCircle } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -46,46 +46,19 @@ export function AddOperation({ onSuccess }: AddOperationProps) {
     try {
       // Validação básica
       if (!formData.date || !formData.ticker || !formData.operation || !formData.quantity || !formData.price) {
-        setError("Todos os campos obrigatórios devem ser preenchidos");
-        toast({ title: "Erro de Validação", description: "Todos os campos obrigatórios devem ser preenchidos", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      const quantityVal = Number.parseInt(formData.quantity);
-      if (isNaN(quantityVal) || quantityVal <= 0) {
-        setError("A quantidade deve ser um número inteiro maior que zero.");
-        toast({ title: "Erro de Validação", description: "A quantidade deve ser um número inteiro maior que zero.", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      const priceVal = Number.parseFloat(formData.price.replace(",", "."));
-      if (isNaN(priceVal) || priceVal <= 0) {
-        setError("O preço deve ser um número maior que zero. Use ponto ou vírgula como separador decimal.");
-        toast({ title: "Erro de Validação", description: "O preço deve ser um número maior que zero. Use ponto ou vírgula como separador decimal.", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      const feesVal = formData.fees ? Number.parseFloat(formData.fees.replace(",", ".")) : 0;
-      if (isNaN(feesVal) || feesVal < 0) {
-        setError("As taxas devem ser um número igual ou maior que zero. Use ponto ou vírgula como separador decimal.");
-        toast({ title: "Erro de Validação", description: "As taxas devem ser um número igual ou maior que zero. Use ponto ou vírgula como separador decimal.", variant: "destructive" });
-        setLoading(false);
-        return;
+        throw new Error("Todos os campos obrigatórios devem ser preenchidos")
       }
 
       const operationData = {
         date: formData.date,
         ticker: formData.ticker.toUpperCase(),
         operation: formData.operation,
-        quantity: quantityVal,
-        price: priceVal,
-        fees: feesVal,
-      };
+        quantity: Number.parseInt(formData.quantity),
+        price: Number.parseFloat(formData.price),
+        fees: Number.parseFloat(formData.fees) || 0,
+      }
 
-      await api.post("/operacoes", operationData);
+      await api.post("/operacoes", operationData)
 
       toast({
         title: "Sucesso!",
@@ -218,14 +191,7 @@ export function AddOperation({ onSuccess }: AddOperationProps) {
 
           <div className="flex gap-4 pt-4">
             <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adicionando...
-                </>
-              ) : (
-                "Adicionar Operação"
-              )}
+              {loading ? "Adicionando..." : "Adicionar Operação"}
             </Button>
             <Button
               type="button"

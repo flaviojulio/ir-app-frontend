@@ -12,12 +12,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      delete api.defaults.headers.common["Authorization"];
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+      localStorage.removeItem("token")
+      delete api.defaults.headers.common["Authorization"]
+      window.location.reload()
     }
-    return Promise.reject(error);
+    return Promise.reject(error)
   },
-);
+)

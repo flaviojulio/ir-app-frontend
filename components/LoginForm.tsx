@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { TrendingUp, BarChart3, PieChart, Loader2 } from "lucide-react"
+import { TrendingUp, BarChart3, PieChart } from "lucide-react"
 
 export function LoginForm() {
   const [username, setUsername] = useState("")
@@ -26,7 +26,30 @@ export function LoginForm() {
     try {
       await login(username, password)
     } catch (error: any) {
-      setError(error.response?.data?.detail || "Erro ao fazer login")
+      let displayErrorMessage = "Ocorreu um erro ao tentar fazer login.";
+      const detail = error.response?.data?.detail;
+
+      if (typeof detail === 'string') {
+        displayErrorMessage = detail;
+      } else if (typeof detail === 'object' && detail !== null) {
+        // Check for Pydantic validation error structure
+        if (Array.isArray(detail) && detail.length > 0 && detail[0].msg && typeof detail[0].msg === 'string') {
+          displayErrorMessage = detail[0].msg;
+        } else if (typeof detail.msg === 'string') { // For {type, loc, msg, input}
+          displayErrorMessage = detail.msg;
+        } else if (typeof detail.message === 'string') { 
+          displayErrorMessage = detail.message;
+        } else {
+          console.error("Unknown error object structure:", detail);
+          displayErrorMessage = "Ocorreu um erro desconhecido ao processar os detalhes do erro.";
+        }
+      } else if (typeof error.message === 'string' && error.message) {
+        displayErrorMessage = error.message;
+      }
+      
+      setError(displayErrorMessage);
+      // Assuming you might also want to use toast here, though not explicitly in original code
+      // toast({ title: "Erro no Login", description: displayErrorMessage, variant: "destructive" });
     } finally {
       setLoading(false)
     }
@@ -116,14 +139,7 @@ export function LoginForm() {
               )}
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Entrando...
-                  </>
-                ) : (
-                  "Entrar"
-                )}
+                {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 

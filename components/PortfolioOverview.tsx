@@ -3,11 +3,12 @@
 import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, DollarSign, BarChart3 } from "lucide-react"
+import type { Operacao, CarteiraItem, ResultadoMensal } from "@/lib/types"
 
 interface PortfolioOverviewProps {
-  carteira: any[]
-  resultados: any[]
-  operacoes: any[]
+  carteira: CarteiraItem[]
+  resultados: ResultadoMensal[]
+  operacoes: Operacao[]
 }
 
 export function PortfolioOverview({ carteira, resultados, operacoes }: PortfolioOverviewProps) {

@@ -3,7 +3,6 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { api } from "@/lib/api"
-import { toast } from "@/hooks/use-toast"
 
 interface User {
   id: number
@@ -53,34 +52,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     formData.append("username", username)
     formData.append("password", password)
 
-    try {
-      const response = await api.post("/auth/login", formData)
-      const { access_token, usuario } = response.data
+    const response = await api.post("/auth/login", formData)
+    const { access_token } = response.data
 
-      localStorage.setItem("token", access_token)
-      api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`
+    localStorage.setItem("token", access_token)
+    api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`
 
-      await fetchUser()
-      // User state might not be updated yet, so use 'usuario' from response
-      toast({ title: "Login realizado!", description: `Bem-vindo, ${usuario.nome_completo || usuario.username}!` });
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || "Erro ao fazer login";
-      toast({ title: "Erro no Login", description: errorMessage, variant: "destructive" });
-      // Re-throw the error if you want to propagate it further or handle it elsewhere
-      throw error;
-    }
+    await fetchUser()
   }
 
   const logout = async () => {
     try {
       await api.post("/auth/logout")
     } catch (error) {
-      // Ignore errors on logout, but still show toast
+      // Ignore errors on logout
     } finally {
       localStorage.removeItem("token")
       delete api.defaults.headers.common["Authorization"]
       setUser(null)
-      toast({ title: "Logout realizado", description: "Você foi desconectado." });
     }
   }
 

@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown } from "lucide-react"
+import type { CarteiraItem } from "@/lib/types"
 
 interface StockTableProps {
-  carteira: any[]
+  carteira: CarteiraItem[]
   onUpdate: () => void
 }
 
@@ -69,7 +70,7 @@ export function StockTable({ carteira, onUpdate }: StockTableProps) {
                 <TableHead className="text-right">Valor Total</TableHead>
                 <TableHead className="text-right">Ganho/Perda</TableHead>
                 <TableHead className="text-right">%</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
+                {/* <TableHead className="text-center">Ações</TableHead> */}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -108,13 +109,15 @@ export function StockTable({ carteira, onUpdate }: StockTableProps) {
                       {unrealizedGainPercent >= 0 ? "+" : ""}
                       {unrealizedGainPercent.toFixed(2)}%
                     </TableCell>
+                    {/* 
                     <TableCell className="text-center">
                       <Button variant="ghost" size="sm">
                         <Edit className="h-4 w-4" />
                       </Button>
-                    </TableCell>
+                    </TableCell> 
+                    */}
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
