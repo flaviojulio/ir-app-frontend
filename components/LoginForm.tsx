@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { TrendingUp, BarChart3, PieChart } from "lucide-react"
+import { TrendingUp, BarChart3, PieChart, Loader2 } from "lucide-react"
 
 export function LoginForm() {
   const [username, setUsername] = useState("")
@@ -116,7 +116,14 @@ export function LoginForm() {
               )}
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Entrando..." : "Entrar"}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  "Entrar"
+                )}
               </Button>
             </form>
 

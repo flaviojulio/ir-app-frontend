@@ -11,6 +11,7 @@ import { StockTable } from "@/components/StockTable"
 import { TaxMeter } from "@/components/TaxMeter"
 import { UploadOperations } from "@/components/UploadOperations"
 import { AddOperation } from "@/components/AddOperation"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { OperationsHistory } from "@/components/OperationsHistory"
 import { TaxResults } from "@/components/TaxResults"
 import { useToast } from "@/hooks/use-toast"
@@ -68,9 +69,9 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <LoadingSpinner />
       </div>
-    )
+    );
   }
 
   return (

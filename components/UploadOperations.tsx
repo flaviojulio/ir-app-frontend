@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react"
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -39,41 +39,59 @@ export function UploadOperations({ onSuccess }: UploadOperationsProps) {
   const handleUpload = async () => {
     if (!file) return
 
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      // Client-side JSON validation
+      const fileContent = await file.text();
+      let parsedData;
+      try {
+        parsedData = JSON.parse(fileContent);
+      } catch (e) {
+        throw new Error("Arquivo JSON inválido ou mal formatado.");
+      }
+
+      if (!Array.isArray(parsedData)) {
+        throw new Error("O conteúdo do JSON deve ser uma lista/array de operações.");
+      }
+      
+      if (parsedData.length > 0 && (typeof parsedData[0] !== 'object' || parsedData[0] === null)) {
+        throw new Error("Os itens na lista de operações devem ser objetos válidos.");
+      }
+
+      // If all client-side checks pass, proceed with upload
+      const formData = new FormData();
+      formData.append("file", file);
 
       const response = await api.post("/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      })
+      });
 
       toast({
         title: "Sucesso!",
         description: response.data.mensagem,
-      })
+      });
 
-      setFile(null)
+      setFile(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = "";
       }
-      onSuccess()
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || "Erro ao fazer upload do arquivo"
-      setError(errorMessage)
+      onSuccess();
+    } catch (validationOrApiError: any) {
+      const errorMessage = validationOrApiError.response?.data?.detail || validationOrApiError.message || "Erro ao processar o arquivo";
+      setError(errorMessage);
       toast({
         title: "Erro",
         description: errorMessage,
         variant: "destructive",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const exampleData = [
     {
@@ -126,7 +144,14 @@ export function UploadOperations({ onSuccess }: UploadOperationsProps) {
           )}
 
           <Button onClick={handleUpload} disabled={!file || loading} className="w-full">
-            {loading ? "Fazendo upload..." : "Fazer Upload"}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Fazendo upload...
+              </>
+            ) : (
+              "Fazer Upload"
+            )}
           </Button>
         </CardContent>
       </Card>
